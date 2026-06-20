@@ -1,0 +1,402 @@
+;
+; main.asm
+;
+; The entrypoint to your game! 
+; Everything you will write should go into files included in this file, 
+; or of course this file itself.
+; 
+; Note: Much of this was lifted and adapted from the nerdy nights tutorials
+; https://nerdy-nights.nes.science
+
+; System defines for various registers on the console
+.include "./system-defines.asm"
+.include "./mapper.asm"
+
+;
+; iNES header
+; 
+; This declares basic information about your game. You probably don't want
+; to change it.
+;
+.segment "HEADER"
+
+    INES_MAPPER = 2 ; 2 = unrom
+    INES_MIRROR = 1 ; 0 = horizontal mirroring, 1 = vertical mirroring
+    INES_SRAM   = 0 ; 1 = battery backed SRAM at $6000-7FFF
+
+    .byte 'N', 'E', 'S', $1A ; ID
+    .byte 16 ; 16k PRG chunk count
+    .byte 0 ; 8k CHR chunk count
+    .byte INES_MIRROR | (INES_SRAM << 1) | ((INES_MAPPER & $f) << 4)
+    .byte (INES_MAPPER & %11110000)
+    .byte $0, $0, $0, $0, $0, $0, $0, $0 ; padding
+
+;
+; Graphics
+; 
+; Includes chr files for the graphics -see the included file for more details.
+;
+
+.include "../../graphics/graphics.config.asm"
+
+;
+; Vectors
+; 
+; These definitions have to be kept here so the NES knows how to reset the game, and what to call when
+; it's time to redraw the screen. 
+;
+
+.segment "VECTORS"
+    .word nmi
+    .word reset
+    .word irq
+
+;
+; ZeroPage variables 
+; 
+; This is a section of "special" variables that can be accessed faster than the rest, because they are in the first "page" of
+; memory. It can have up to 256 bytes worth of variables in it. They otherwise work the same as all other variables.
+;
+
+.segment "ZEROPAGE"
+    backgroundPointerLo: .res 1    ; pointer variables declared in RAM
+    backgroundPointerHi: .res 1    ; low byte first, high byte immediately after
+    ; palPtr: .res 2 ; Low then High
+    chrramPtr: .res 2 ; Low then High
+    nmiFrameCount: .res 1          ; 256 byte counter, will increment every time nmi is called. Used to wait for vblank
+    vblankPreviousFrame: .res 1    ; Used to track when we started waiting for vblank
+
+;
+; OAM Memory
+; 
+; This is the sprite memory for your game. IT is used for "hardware" sprites (you might create more information for your)
+; sprites elsewhere. Don't add anything here.
+;
+
+.segment "OAM"
+    oam: .res 256        ; sprite OAM data to be uploaded by DMA
+
+;
+; BSS variables
+; 
+; This is the "rest" of the memory for your game. There are about 1500 bytes available in total.
+
+.segment "BSS"
+; yourvariable: .res 8
+testVariable: .res 1
+
+
+; 
+; Main Code area
+; 
+; You know this one! This is the primary code bank for your game. There may be more banks available, but this 
+; one will always be loaded. 
+;
+
+.segment "CODE"
+FAMISTUDIO_DPCM_OFF = dmc
+.include "./sound/music_abyssgarding_preabyss_title.s"
+.include "./famistudio/famistudio_ca65.s"
+
+    ;
+    ; reset routine
+    ;
+    ; This is used to reset the NES (and sometimes memory on your cartridge) to a known state, so the game
+    ; can play consistently. Don't change this unless you know what you're doing!
+    ; Note: It should be the first thing written to the CODE segment, so it's always the first thing the console runs!
+    ;
+.segment "CODE"
+
+    reset:
+        sei       ; mask interrupts
+        lda #0
+        sta PPU_CTRL    ; disable NMI
+        sta PPU_MASK    ; disable rendering
+        sta APU_STATUS  ; disable APU sound
+        sta APU_DMC_IRQ ; disable DMC IRQ
+        lda #$40
+        sta APU_FRAME_COUNTER ; disable APU IRQ
+        cld                   ; disable decimal mode
+        ldx #$FF
+        txs       ; initialize stack
+        ; wait for first vblank
+        bit PPU_STATUS
+        :
+            bit PPU_STATUS
+            bpl :-
+        ; clear all RAM to 0
+        lda #0
+        ldx #0
+        :
+            sta $0000, X
+            sta $0100, X
+            sta $0200, X
+            sta $0300, X
+            sta $0400, X
+            sta $0500, X
+            sta $0600, X
+            sta $0700, X
+            inx 
+            bne :-
+        ; place all sprites offscreen at Y=255
+        lda #255
+        ldx #0
+        :
+            sta oam, X
+            inx 
+            inx 
+            inx 
+            inx 
+            bne :-
+        ; wait for second vblank
+        :
+            bit PPU_STATUS
+            bpl :-
+
+        ; Do any initialization the mapper needs
+        jsr initialize_mapper
+
+        ; NES is initialized, ready to begin!
+        lda #255
+        ldx #<music_data_preabyss_title
+        ldy #>music_data_preabyss_title
+        jsr famistudio_init
+
+        ; enable the NMI for graphical updates, and jump to our main program
+        lda #%10001000
+        sta PPU_CTRL
+        jmp main
+
+
+    ;
+    ; Main entrypoint
+    ; 
+    ; This is the "start" of your game. It is the very first thing that is run after power on.
+    ; You'll often want to put a logic loop here, or something like that.
+    ; 
+
+    main:
+
+        ; First write palettes that we define later on in the file. This will write
+        ; both the nametable and sprite palettes.
+        jsr updatePal
+
+        ; Next we'll update the CHRRAM because this uses UNROM
+        lda #<bg0
+        sta chrramPtr
+        lda #>bg0
+        sta chrramPtr+1
+        jsr updateUnromCHRRAM
+
+        ; Then, we will update the nametables
+        lda #<background
+        sta backgroundPointerLo
+        lda #>background
+        sta backgroundPointerHi
+        jsr updateNT ;// Skip PPU Off because PPU is already off
+
+        ; Set testVariable to 1 for unit tests
+        lda #1
+        sta testVariable
+
+        lda #0
+        jsr famistudio_music_play
+
+        loop_de_forever:
+        ; After getting through the drawing, just run an infinite loop. Effectively crashes the game on the new screen.
+        @forever:
+            jsr vblankwait
+            jmp @forever 
+
+    ;
+    ; NMI Handler
+    ; 
+    ; This will run once every frame, and give you a chance to update graphics. Keep it short!
+    ;
+
+    nmi:
+        ; Store all registers - since this can run at any time, and any changes we make to the registers
+        ; will impact whatever code was running before otherwise. 
+        pha 
+        txa 
+        pha 
+        tya 
+        pha 
+
+        ; Tell the ppu to draw sprites from $0200 to the screen
+        lda #$02
+        sta OAM_DMA
+
+        ; Keep track of how many frames have run (note: this loops over to 0 after 255.)
+        inc nmiFrameCount
+
+        ; Update sound engine
+        jsr famistudio_update
+
+        ; Restore all registers from the stack
+        pla 
+        tay 
+        pla 
+        tax 
+        pla 
+
+        rti ; Return from interrupt 
+
+
+    ; 
+    ; Helper function: Wait for a vblank to happen
+    ; 
+    ; Waits until the frame count is incremented by the nmi method
+    ; 
+
+    vblankwait:
+        lda nmiFrameCount
+        sta vblankPreviousFrame
+
+        @vblank_wait:
+            cmp nmiFrameCount
+            beq @vblank_wait
+        rts 
+    ; 
+    ; IRQ Handler
+    ;
+    ; Empty - we don't need to use them, but a handler must be present.
+    irq:
+        rti 
+    
+    updateUnromCHRRAM:
+        ; Next we need to load graphics data into the chr ram, so we see something on the screen. So, let's use nested 
+        ; loops to copy that all over. 
+        ; NOTE: This copies both the background and sprite graphics at once, since we store them in prg in sequence. 
+        ; If you want to break them up, change the `cpx #$20` line below to be `cpx #$10` to only copy 4kb then repeat
+        ; the code again with a new address!
+        lda PPU_STATUS ; read ppu status to reset the high/low latch
+        lda #0
+        sta PPU_ADDR ; Write the high byte
+        sta PPU_ADDR ; Write 0 to the low byte as well, since we want to start at $0000
+        ldx #$00                ; start at pointer + 0
+        ldy #$00
+        @ramOutsideLoop:
+
+            @ramInsideLoop:
+                lda (chrramPtr),Y       ; copy one background byte from address in pointer + Y
+                sta PPU_DATA            ; runs 256*32=8192 times
+
+                iny                     ; inside loop counter
+                cpy #$00                
+                bne @ramInsideLoop         ; run inside loop 256 times before continuing
+
+            inc chrramPtr+1     ; low byte went from 0 -> 256, so high byte needs to be changed now
+
+            inx                     ; increment outside loop counter
+            cpx #$20                ; needs to happen $20 times, to copy 8KB data
+            bne @ramOutsideLoop
+        rts 
+
+    updateNT:
+        ; Disable everything
+        lda #0
+        sta PPU_CTRL
+        sta PPU_MASK
+	updateNT_SkipPPUDisable:
+        lda #$20
+        sta PPU_ADDR
+        lda #$00
+        sta PPU_ADDR
+        ldx #$08
+        ldy #$00
+        lda #$00 ; clear background tile
+        @nametableWriteLoop:
+            sta PPU_DATA
+            dey 
+            bne @nametableWriteLoop
+            dex 
+            bne @nametableWriteLoop
+
+                    
+        ; Use nested loops to load the background efficiently
+        lda PPU_STATUS          ; read PPU status to reset the high/low latch
+        lda #$20
+        sta PPU_ADDR            ; write high byte of $2000 address
+        lda #$00
+        sta PPU_ADDR            ; write low byte of $2000 address
+
+        ; lda testVariable
+        ; bne :+
+        ; lda #<background 
+        ; sta backgroundPointerLo ; put the low byte of address of background into pointer
+        ; lda #>background        ; #> is the same as HIGH() function in NESASM, used to get the high byte
+        ; sta backgroundPointerHi ; put high byte of address into pointer
+        ; :
+
+        ldx #$00                ; start at pointer + 0
+        ldy #$00
+        @outsideLoop:
+
+            @insideLoop:
+                lda (backgroundPointerLo),Y       ; copy one background byte from address in pointer + Y
+                sta PPU_DATA            ; runs 256*4=1024 times
+
+                iny                     ; inside loop counter
+                cpy #$00                
+                bne @insideLoop         ; run inside loop 256 times before continuing
+
+            inc backgroundPointerHi     ; low byte went from 0 -> 256, so high byte needs to be changed now
+
+            inx                     ; increment outside loop counter
+            cpx #$04                ; needs to happen 4 times, to copy 1KB data
+            bne @outsideLoop         
+
+
+        ; Reset ppu scrolling by writing 0 to both the X and Y positions.
+        lda #0
+        sta PPU_SCROLL
+        sta PPU_SCROLL
+        ; Re-enable everything to show the graphics again.
+        cli             ; Re-enable interrupts
+        lda #%10001000  ; enable NMI, sprites from pattern table 1, background from 0
+        sta PPU_CTRL
+        lda #%00011110  ; background and sprites enable, no left clipping
+        sta PPU_MASK
+        rts 
+
+	updatePal:
+        ; Next we'll write palettes that we define later on in the file. This will write
+        ; both the nametable and sprite palettes.
+        lda PPU_STATUS
+        lda #$3f
+        sta PPU_ADDR
+        lda #$00
+        sta PPU_ADDR
+        ldx #$00
+        @loadPalettesLoop:
+            lda palette,X   ; load data from adddress (palette + X)
+                            ; 1st time through loop it will load palette+0
+                            ; 2nd time through loop it will load palette+1
+                            ; 3rd time through loop it will load palette+2
+                            ; etc
+            sta PPU_DATA
+            inx 
+            cpx #$20
+            bne @loadPalettesLoop
+        rts 
+
+    ;
+    ; Data
+    ; 
+    ; Game data is in this section. It's in the same code bank as above, and is only separated to make it easier to understand.
+    ;
+
+    ; Include the nametable data as a binary file
+    background:
+        .incbin "../../graphics/title.nam"
+    
+    ; Do the same with palettes
+    palette:
+        ; Foreground first
+        .incbin "../../graphics/palette.pal"
+        ; Next, background. We don't have two palettes created, so repeat the same palette for now
+        ; .incbin "../../graphics/example.pal"
+
+    dmc:
+        .incbin "./sound/abyssgarding.dmc"
