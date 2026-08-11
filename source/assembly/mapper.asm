@@ -14,16 +14,16 @@
     ; Set the prg bank to be used.
     unrom_set_prg_bank:
     _unrom_set_prg_bank:
-        tax
+        tax 
         sta unrom_banktable, x
-        rts
+        rts 
     .export _unrom_set_prg_bank
 
     initialize_mapper:
         ; Start in bank 0
         lda #0
         jsr unrom_set_prg_bank
-        rts
+        rts 
 
 ; Make sure to put something in every bank, so the library doesn't get confused. Let's just jump to reset.
 .segment "ROM_00" 

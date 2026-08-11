@@ -1,36 +1,45 @@
 # Abyssgarding
 
-Abyssgarding, as the name suggests, is a Hololive indie game about the two demon dog twins Fuwawa and Mococo Abyssgard fron HoloEN Advent
+Abyssgarding, as the name suggests, is a Hololive indie game about the two demonic dog twins Fuwawa and Mococo Abyssgard fron Hololive English Advent
 
-# How to compile
+## World planning
+
+- World 1: Underworld/Abyss
+- World 2: Underground
+- World 3: Underwater
+- World 4: Above Water
+- World 5: Above Ground
+- World 6: Castle
+
+## How to compile
 
 This rom uses [create-nes-game](https://create-nes-game.nes.science/) to build. Download a copy
 of that to start.
 
-## First time setup
+### First time setup
 
 1. Download [create-nes-game](https://create-nes-game.nes.science/), if you haven't already.
 2. (Optional) Run `./create-nes-game install` to install the tool globally
 3. Run `create-nes-game download-dependencies` to download dependencies of this game into this folder
 4. Proceed to the next section to build the rom.
 
-## Building the game
+### Building the game
 
 To build the rom, run `create-nes-game build` in the same directory as this readme file.
 
 You can run the game using the selected emulator (if available on your operating system) using the
 `create-nes-game run` command. Alternatively, the rom is available in the `rom/` folder.
 
-## Running unit tests
+### Running unit tests
 
 This rom includes unit tests that can be used to verify that the game works. Run them using the
 `create-nes-game test` command.
 
 The tests are located in the `test/` folder.
 
-# Directory layout
+## Directory layout
 
-```
+```text
 abyssgarding
 └─ config/                  - Configuration for the assembler/compiler
 └─ graphics/                - Graphics data - backgrounds, palettes, and nametables
@@ -54,13 +63,36 @@ abyssgarding
 
 ## Music
 
-Music is created using [Famitracker 0.4.6](http://famitracker.com/). Once you have music you like, you'll need to
+Music is created using [FamiStudio 4.5.x](https://famistudio.org). Once you have music you like, you'll need to
 export it for use with this engine. Follow these steps to do so:
 
-1. In the `File` menu, select `Export Text`
-2. Save the generated file into the `sound/` folder as `music.txt`
+> The `.fms` is NOT usable, but you can to import the file `source/soundFiles/Abyssgarding (FUWAMOCO).txt`
+> into Famistudio
+
+1. In the `Export` menu, select `Export FamiStudio Music Code` and use format 'CA65'
+2. Select the music you wanna use
+3. Turn on "Seperate Files"
+4. Use the song name pattern `music_{project}_{song}` and DMC name pattern `{project}_dmc`
+5. Save the generated file into the `source/assembly/sound/` folder as `music.s`
 
 Next time you run `create-nes-game build` your new music will be added to the game.
+
+## SFX
+
+SFX are created using [FamiStudio 4.5.x](http://famistudio.org). Once you have sfx you like, you'll need to
+export it for use with this engine. Follow these steps to do so:
+
+1. In the `Export` menu, select `Export FamiStudio SFX Code`
+2. Select the Menu SFX
+3. Save the generated file into the `source/assembly/sound/` folder as `sfx_men.s`
+4. Go into the generated file and change `sounds` to `sounds_menu` and remove or comment out `.export _sounds:=sounds`
+5. Go into the generated include file and remove the SFX Strings to prevent a CA65 error
+6. Select the In-Game SFX
+7. Save the generated file into the `source/assembly/sound/` folder as `sfx_gam.s`
+8. Go into the generated file and change `sounds` to `sounds_game`
+9. Go into the generated include file and remove the SFX Strings to prevent a CA65 error
+
+Next time you run `create-nes-game build` your new sfx will be added to the game.
 
 ---
 

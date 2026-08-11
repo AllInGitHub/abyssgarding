@@ -2,7 +2,7 @@ FAMISTUDIO SOUND ENGINE
 =======================
 
 This is the FamiStudio sound engine. It is used by the NSF and ROM exporter of FamiStudio and can be used to make 
-games. It supports every feature from FamiStudio, some of them are toggeable to save CPU/memory.
+games. It supports every feature from FamiStudio, some of them are toggleable to save CPU/memory.
 
 This is essentially a heavily modified version of FamiTone2 by Shiru. A lot of his code and comments are still
 present here, so massive thanks to him!! I am not trying to steal his work or anything, i renamed a lot of functions

@@ -61,13 +61,16 @@
 ; FamiStudio Global Engine Settings (External only)
 ;
 
+FAMISTUDIO_CFG_EXTERNAL = 1
+
 ; One of these MUST be defined (PAL or NTSC playback). Note that only NTSC support is supported when using any of the audio expansions.
 ; FAMISTUDIO_CFG_PAL_SUPPORT   = 1
 FAMISTUDIO_CFG_NTSC_SUPPORT  = 1
 
 ; Support for sound effects playback + number of SFX that can play at once.
-; FAMISTUDIO_CFG_SFX_SUPPORT   = 1
-; FAMISTUDIO_CFG_SFX_STREAMS   = 2
+FAMISTUDIO_CFG_SFX_SUPPORT   = 1
+FAMISTUDIO_CFG_SFX_STREAMS   = 3
+SFX_STRINGS = 0
 
 ; Blaarg's smooth vibrato technique. Eliminates phase resets ("pops") on square channels. 
 ; FAMISTUDIO_CFG_SMOOTH_VIBRATO = 1
@@ -77,6 +80,59 @@ FAMISTUDIO_CFG_DPCM_SUPPORT   = 1
 
 ; Must be enabled if you are calling sound effects from a different thread than the sound engine update.
 ; FAMISTUDIO_CFG_THREAD         = 1
+
+;
+; Expansion Chips
+;
+
+; Konami VRC6 (2 extra square + saw)
+; FAMISTUDIO_EXP_VRC6 = 1
+
+; Rainbow-Net (homebrew clone of VRC6)
+; FAMISTUDIO_EXP_RAINBOW = 1
+
+; Konami VRC7 (6 FM channels)
+; FAMISTUDIO_EXP_VRC7 = 1 
+
+; Nintendo MMC5 (2 extra squares, extra DPCM not supported)
+; FAMISTUDIO_EXP_MMC5 = 1 
+
+; Sunsoft S5B (2 extra squares, advanced features not supported.)
+; FAMISTUDIO_EXP_S5B = 1 
+
+; Famicom Disk System (extra wavetable channel)
+; FAMISTUDIO_EXP_FDS = 1 
+
+; Namco 163 (between 1 and 8 extra wavetable channels) + number of channels.
+; FAMISTUDIO_EXP_N163          = 1 
+; FAMISTUDIO_EXP_N163_CHN_CNT  = 4
+
+; EPSM (Expansion Port Sound Module)
+; FAMISTUDIO_EXP_EPSM          = 1
+; Fine-tune control for enabling specific channels
+; Default values for the channels are to enable all channels.
+; FAMISTUDIO_EXP_EPSM_SSG_CHN_CNT        = 3
+; FAMISTUDIO_EXP_EPSM_FM_CHN_CNT         = 6
+; FAMISTUDIO_EXP_EPSM_RHYTHM_CHN1_ENABLE = 1
+; FAMISTUDIO_EXP_EPSM_RHYTHM_CHN2_ENABLE = 1
+; FAMISTUDIO_EXP_EPSM_RHYTHM_CHN3_ENABLE = 1
+; FAMISTUDIO_EXP_EPSM_RHYTHM_CHN4_ENABLE = 1
+; FAMISTUDIO_EXP_EPSM_RHYTHM_CHN5_ENABLE = 1
+; FAMISTUDIO_EXP_EPSM_RHYTHM_CHN6_ENABLE = 1
+
+;
+; FamiStudio Project-Local Engine Settings
+;
+
+; ALREADY ENABLED/DEFINED (Ignore if external):
+; FAMISTUDIO_USE_RELEASE_NOTES (1)
+; FAMISTUDIO_USE_VOLUME_TRACK (1)
+; FAMISTUDIO_USE_PITCH_TRACK (1)
+; FAMISTUDIO_USE_SLIDE_NOTES (1)
+; FAMISTUDIO_USE_NOISE_SLIDE_NOTES (1)
+; FAMISTUDIO_USE_VIBRATO (1)
+; FAMISTUDIO_USE_ARPEGGIO (1)
+; FAMISTUDIO_USE_DUTYCYCLE_EFFECT (1)
 
 ; Required flags for Abyssgarding:
 FAMISTUDIO_USE_RELEASE_NOTES = 1
