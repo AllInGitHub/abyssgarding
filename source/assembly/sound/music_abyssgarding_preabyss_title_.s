@@ -10,13 +10,13 @@
 ; FAMISTUDIO_USE_ARPEGGIO = 1
 ; FAMISTUDIO_USE_DUTYCYCLE_EFFECT = 1
 
-.export _music_data_preabyss_title:=music_data_preabyss_title
+.export _music_data_preabyss_title_:=music_data_preabyss_title_
 
-music_data_preabyss_title:
+music_data_preabyss_title_:
 	.byte 1
 	.word @instruments
 	.word @samples-4
-; 00 : Preabyss (Title)
+; 00 : Preabyss (Title) ()
 	.word @song0ch0
 	.word @song0ch1
 	.word @song0ch2
@@ -24,7 +24,7 @@ music_data_preabyss_title:
 	.word @song0ch4
 	.byte .lobyte(@tempo_env_1_end), .hibyte(@tempo_env_1_end), 0, 0
 
-.export music_data_preabyss_title
+.export music_data_preabyss_title_
 .global FAMISTUDIO_DPCM_PTR
 
 @instruments:

@@ -21,4 +21,4 @@ sound/music.asm
 sound/sfx.asm
 
 /graphics/create-nes-game-font.png
-/rom
+/rom/*

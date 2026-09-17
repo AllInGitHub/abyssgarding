@@ -1,6 +1,6 @@
 # Abyssgarding
 
-Abyssgarding, as the name suggests, is a Hololive indie game about the two demonic dog twins Fuwawa and Mococo Abyssgard fron Hololive English Advent
+Abyssgarding, as the name suggests, is a Hololive indie game about the two demonic dog twins Fuwawa and Mococo Abyssgard fron Hololive Advent
 
 ## World planning
 
@@ -10,6 +10,21 @@ Abyssgarding, as the name suggests, is a Hololive indie game about the two demon
 - World 4: Above Water
 - World 5: Above Ground
 - World 6: Castle
+
+## FWMC state bytes `fwmcstates` (`$0006`)
+
+Unlike must video games which use bytewise enumerations for state machines, Abyssgarding takes an approach that's easier to implement: the BITWISE approach
+
+Here is the base structure. The structure shared between the 2 bytes
+
+```text
+7     bit     0
+- - - - - - D G
+            | |
+            | └── Grounded:           0 if airborne, 1 if grounded (Duh)
+            |
+            └──── Movement Direction: 0 for right, 1 for left
+```
 
 ## How to compile
 
@@ -67,7 +82,7 @@ Music is created using [FamiStudio 4.5.x](https://famistudio.org). Once you have
 export it for use with this engine. Follow these steps to do so:
 
 > The `.fms` is NOT usable, but you can to import the file `source/soundFiles/Abyssgarding (FUWAMOCO).txt`
-> into Famistudio
+> into FamiStudio
 
 1. In the `Export` menu, select `Export FamiStudio Music Code` and use format 'CA65'
 2. Select the music you wanna use

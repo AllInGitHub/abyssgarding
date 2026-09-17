@@ -8,11 +8,52 @@
 ; Note: Much of this was lifted and adapted from the nerdy nights tutorials
 ; https://nerdy-nights.nes.science
 
-.include "sound\sfx_men_sfxlist.inc"
+.include "sound/sfx_men_sfxlist.inc"
 
 ; System defines for various registers on the console
 .include "./system-defines.asm"
 .include "./mapper.asm"
+
+;
+; Enums and Structs
+;
+
+.enum States
+	blank ; Empty
+	mainmenu ; Menu Screen
+	settings ; Settings Screen (Before starting the game)
+	abyssMap ; Map of a world
+	abyssMenus ; Menu of a world's level beore it loads
+	abyssLevels ; The main gameplay state
+.endenum
+
+.enum Worlds
+	abyss0 ; Tutorial Stage
+	abyss1 ; Underworld/Abyss Levels
+	abyss2 ; Underground Levels
+	abyss3 ; Underwater Levels
+	abyss4 ; Overseas/Above Water Levels
+	abyss5 ; Overworld/Above Ground Levels
+	abyss6 ; Castle Levels
+.endenum
+
+.struct Velocity
+	velx .byte ; X Velocity (Signed 8-bit Byte)
+	vely .byte ; Y Velocity (Signed 8-bit Byte)
+	prx .word ; Result Point X (Signed 16-bit Fixed-Point Word (4-bit density))
+	pry .word ; Result Point Y (Signed 16-bit Fixed-Point Word (4-bit density))
+.endstruct
+
+.struct RomPtr
+	ptr .word ; Low then High
+	bank .byte ; >= $F means do not change
+.endstruct
+
+.struct Level
+	world .byte
+	offset .byte
+	pointer .tag RomPtr
+.endstruct
 
 ;
 ; iNES header
@@ -67,15 +108,38 @@
 	chrramPtr: .res 2 ; Low then High
 	nmiFrameCount: .res 1          ; 256 byte counter, will increment every time nmi is called. Used to wait for vblank
 	vblankPreviousFrame: .res 1    ; Used to track when we started waiting for vblank
+	fwmcstates: .res 2 ; fwmcstates+0 for Fuwawa; fwmcstates+1 for Mococo
+	gamestate: .res 1
+	gamestatereq: .res 1
+	dynamicJumpAddr: .res 3 ; Low then High then Bank Number
+	jumpTableLoBytesPtr: .res 3 ; Low then High then Bank Number
+	jumpTableHiBytesPtr: .res 3 ; Low then High then Bank Number
+	fuwavel: .tag Velocity
+	mocovel: .tag Velocity
+	choice: .res 1
+	arrowLeftPosPtr:  .tag RomPtr
+	arrowRightPosPtr: .tag RomPtr
+	arrowYPosPtr:     .tag RomPtr
+	; Shorthands
+	fuwastate = fwmcstates+0
+	mocostate = fwmcstates+1
+	dynamicJumpPtrLO   = dynamicJumpAddr+0
+	dynamicJumpPtrHI   = dynamicJumpAddr+1
+	dynamicJumpPtrBank = dynamicJumpAddr+2
 ;
 ; OAM Memory
 ; 
 ; This is the sprite memory for your game. IT is used for "hardware" sprites (you might create more information for your)
 ; sprites elsewhere. Don't add anything here.
 ;
+; Note: This game doesn't shuffle anything in OAM!
+;
 
 .segment "OAM"
 	oam: .res 256        ; sprite OAM data to be uploaded by DMA
+	; Objects: Title Screen
+	oam_arrowLeft  = oam+4
+	oam_arrowRight = oam+8
 
 ;
 ; BSS variables
@@ -88,8 +152,32 @@
 	lastButtons: .res 1
 	pressedButtons: .res 1
 	testVariable: .res 1
+	justGamestateChanged: .res 1
+	arrowsFrame: .res 1
 
+;
+; Batery Backed SRAM variables
+;
+; This is basically the game's save file, but in the late 1980s and
+; early 1990s
+;
 
+.segment "SRAM"
+	gameLearned: .res 1
+
+.if INES_SRAM+INES_MIRROR+INES_MAPPER <> 4
+	.error "LEAVE THE FUCKING HEADER ALONE!"
+.elseif INES_SRAM <> 1 || INES_MIRROR <> 1 || INES_MAPPER <> 2
+	.error "Nice try! LEAVE THE FUCKING HEADER ALONE!"
+.else
+	; "Header is valid!"
+.endif
+
+FAMISTUDIO_DPCM_OFF = dmc
+
+.segment "CODE"
+.include "./famistudio/famistudio_ca65.s"
+.include "./sound/sfx_men.s"
 ; 
 ; Main Code area
 ; 
@@ -98,10 +186,48 @@
 ;
 
 .segment "CODE"
-FAMISTUDIO_DPCM_OFF = dmc
-.include "./sound/music_abyssgarding_preabyss_title.s"
-.include "./famistudio/famistudio_ca65.s"
-.include "./sound/sfx_men.s"
+	.macro switchState
+		sta gamestatereq
+	.endmacro
+
+	.macro choiceCap max
+		lda choice
+			cmp #0
+			bmi :++
+				lda choice
+				cmp #max+1
+				bcc :+
+					ldx #max
+					stx choice
+					jsr playInvalidSFX
+				:
+				jmp @end
+			:
+				ldx #0
+				stx choice
+				jsr playInvalidSFX
+	.endmacro
+
+	.macro loadMusic ptr
+		ldx #<ptr
+		ldy #>ptr
+		jsr famistudio_init
+	.endmacro
+	.macro playLoadedMusic
+		lda #0
+		jsr famistudio_music_play
+	.endmacro
+
+	.macro playSFX idLoadedBank, streamChannel
+		ldx #streamChannel
+		lda #idLoadedBank
+		jsr famistudio_sfx_play
+	.endmacro
+
+	.proc nothing
+		nop ; Vibe check
+		rts 
+	.endproc
 
 	;
 	; reset routine
@@ -129,23 +255,24 @@ FAMISTUDIO_DPCM_OFF = dmc
 			bpl :-
 		; clear all RAM to 0
 		lda #0
-		ldx #0
+		tax 
 		:
-			sta $0000, X
-			sta $0100, X
-			sta $0200, X
-			sta $0300, X
-			sta $0400, X
-			sta $0500, X
-			sta $0600, X
-			sta $0700, X
+			sta $0000, x ; Clears Zeropage
+			sta $0100, x ; Clears Stack(?)
+			sta $0200, x ; Clears OAM
+			; Clear BSS
+			sta $0300, x
+			sta $0400, x
+			sta $0500, x
+			sta $0600, x
+			sta $0700, x
 			inx 
 			bne :-
 		; place all sprites offscreen at Y=255
 		lda #255
 		ldx #0
 		:
-			sta oam, X
+			sta oam, x
 			inx 
 			inx 
 			inx 
@@ -169,16 +296,125 @@ FAMISTUDIO_DPCM_OFF = dmc
 		; enable the NMI for graphical updates, and jump to our main program
 		lda #%10001000
 		sta PPU_CTRL
+		lda #States::mainmenu
+		switchState
 		jmp main
+
+	.proc playInvalidSFX
+		ldx #FAMISTUDIO_SFX_CH1
+		lda #sfx_no
+		jsr famistudio_sfx_play
+		rts 
+	.endproc
 
 	.proc bankFloop
 		clc 
 		clv 
+
 		lda pressedButtons
+		tay 
+		beq @end
+		and #CTRL_BUTTON_S|CTRL_BUTTON_A
+		bne @doOptionThing
+		jmp :+
+		@invalid:
+			jsr playInvalidSFX
+			jmp @end
+		:
+
+		tya 
+		and #CTRL_BUTTON_D
 		beq :+
-		ldx #FAMISTUDIO_SFX_CH1
-		lda #sfx_no
-		jsr famistudio_sfx_play
+			inc choice
+			playSFX sfx_scroll_menu, FAMISTUDIO_SFX_CH1
+			jmp @checkChoice
+		:
+
+		tya 
+		and #CTRL_BUTTON_U
+		beq :+
+			dec choice
+			playSFX sfx_scroll_menu, FAMISTUDIO_SFX_CH1
+			jmp @checkChoice
+		:
+
+		jmp @invalid
+
+		jmp @skipOptionThing
+		@doOptionThing:
+			ldx choice
+			beq @stateSwitchSettings
+			cpx #1
+			beq :+
+			@stateSwitchSettings:
+				lda #States::settings
+				sta gamestatereq
+				jmp :++
+			:
+				jmp @invalid
+			:
+		@skipOptionThing:
+
+		; Do Vibe Check
+		lda nothing
+		cmp #$EA
+		beq :+
+			lda nmiFrameCount
+			sta PPU_SCROLL
+			lda #0
+			sta PPU_SCROLL
+			.byte $02 ; Vibe Check Fail
+			brk 
+		: ; Vibe Check Pass!
+		jmp @end
+		@checkChoice:
+			; lda choice
+			; cmp #0
+			; bmi :++
+			; 	lda choice
+			; 	cmp #3
+			; 	bcc :+
+			; 		ldx #2
+			; 		stx choice
+			; 		jmp @invalid
+			; 	:
+			; 	jmp @end
+			; :
+			; 	ldx #0
+			; 	stx choice
+			; 	jmp @invalid
+			choiceCap 2
+		@end:
+		ldx #<title_leftArrowPositions
+		ldy #>title_leftArrowPositions
+		stx arrowLeftPosPtr+0
+		sty arrowLeftPosPtr+1
+		
+		ldx #<title_rightArrowPositions
+		ldy #>title_rightArrowPositions
+		stx arrowRightPosPtr+0
+		sty arrowRightPosPtr+1
+		
+		ldx #<title_arrowYPositions
+		ldy #>title_arrowYPositions
+		stx arrowYPosPtr+0
+		sty arrowYPosPtr+1
+
+		; jsr processArrows
+		; rts 
+		jmp processArrows
+	.endproc
+
+	.proc settings
+		lda justGamestateChanged
+		beq :+
+			lda #<settingsBG
+			sta backgroundPointerLo
+			lda #>settingsBG
+			sta backgroundPointerHi
+			jsr updateNT
+			loadMusic music_data_abyssmodding_settings
+			playLoadedMusic
 		:
 		rts 
 	.endproc
@@ -187,6 +423,52 @@ FAMISTUDIO_DPCM_OFF = dmc
 		ldx #<sounds_menu
 		ldy #>sounds_menu
 		jsr famistudio_sfx_init
+		rts 
+	.endproc
+
+	.ifdef sounds_game
+	.proc switchToGame
+		ldx #<sounds_game
+		ldy #>sounds_game
+		jsr famistudio_sfx_init
+		rts 
+	.endproc
+	.endif
+
+	.proc processArrows
+		lda nmiFrameCount
+		and #%1111
+		bne :+
+			ldx arrowsFrame
+			inx 
+			txa 
+			and #%11
+			sta arrowsFrame
+		:
+		ldx #$10
+		ldy #%01000000
+		stx oam_arrowLeft+1
+		stx oam_arrowRight+1
+		sty oam_arrowRight+2
+
+		ldy choice
+		; asl a
+		; tay 
+		ldx arrowsFrame
+
+		sec 
+		lda (arrowLeftPosPtr), y
+		sbc arrowAnimationOffsets, x
+		sta oam_arrowLeft+3
+		lda (arrowYPosPtr), y
+		sta oam_arrowLeft+0
+
+		clc 
+		lda (arrowRightPosPtr), y
+		adc arrowAnimationOffsets, x
+		sta oam_arrowRight+3
+		lda (arrowYPosPtr), y
+		sta oam_arrowRight+0
 		rts 
 	.endproc
 
@@ -226,14 +508,55 @@ FAMISTUDIO_DPCM_OFF = dmc
 		sta testVariable
 
 		lda #0
+		; sta justGamestateChanged
 		jsr famistudio_music_play
 
 		loop_de_forever:
 		; After getting through the drawing, just run an infinite loop. Effectively crashes the game on the new screen.
 		@forever:
+			ldx #<jumpTableLO
+			ldy #<jumpTableHI
+			stx jumpTableLoBytesPtr+0
+			sty jumpTableHiBytesPtr+0
+			ldx #>jumpTableLO
+			ldy #>jumpTableHI
+			stx jumpTableLoBytesPtr+1
+			sty jumpTableHiBytesPtr+1
+			jsr dynamicJump
+
 			jsr vblankwait
-			jsr bankFloop
-			jmp @forever 
+			jmp @forever
+
+	.proc dynamicJump
+		ldx #0
+		stx justGamestateChanged
+		; Phase 1: Selection
+		ldy gamestatereq
+		pha 
+		tya 
+		tax 
+		pla 
+		cpx gamestate
+			beq :+
+			ldx #1
+			stx justGamestateChanged
+		:
+		sty gamestate
+		; Phase 2: Lookup
+		lda (jumpTableLoBytesPtr), y
+		sta dynamicJumpAddr+0
+		lda (jumpTableHiBytesPtr), y
+		sta dynamicJumpAddr+1
+
+		lda dynamicJumpAddr+1
+		pha 
+		dec dynamicJumpAddr+0
+		lda dynamicJumpAddr+0
+		pha 
+		; Phase 3: Branching/Jumping - RTS Manipulation
+		@skip:
+		rts 
+	.endproc
 
 	.proc pollInput
 		; Hippity Hoppity, your 6502 CA65 ASM code is now my property (From https://www.nesdev.org/wiki/Controller_reading_code)
@@ -287,12 +610,6 @@ FAMISTUDIO_DPCM_OFF = dmc
 		pha 
 		tya 
 		pha 
-		; lda buttons
-		; pha 
-		; lda lastButtons
-		; pha 
-		; lda pressedButtons
-		; pha 
 
 		; Tell the ppu to draw sprites from $0200 to the screen
 		lda #$02
@@ -303,13 +620,6 @@ FAMISTUDIO_DPCM_OFF = dmc
 
 		; Update sound engine
 		jsr famistudio_update
-
-		; pla 
-		; sta pressedButtons
-		; pla 
-		; sta lastButtons
-		; pla 
-		; sta buttons
 
 		; Poll the conlorllers
 		jsr pollInputSafe
@@ -345,8 +655,9 @@ FAMISTUDIO_DPCM_OFF = dmc
 	;
 	; Empty - we don't need to use them, but a handler must be present.
 	irq:
+		jmp reset
 		rti 
-	
+
 	updateUnromCHRRAM:
 		; Next we need to load graphics data into the chr ram, so we see something on the screen. So, let's use nested 
 		; loops to copy that all over. 
@@ -453,7 +764,7 @@ FAMISTUDIO_DPCM_OFF = dmc
 		sta PPU_ADDR
 		ldy #$00
 		@loadPalettesLoop:
-			lda (chrramPtr),Y ; load data from adddress (palette + X)
+			lda (chrramPtr),y ; load data from adddress (palette + y)
 							  ; 1st time through loop it will load palette+0
 							  ; 2nd time through loop it will load palette+1
 							  ; 3rd time through loop it will load palette+2
@@ -464,11 +775,58 @@ FAMISTUDIO_DPCM_OFF = dmc
 			bne @loadPalettesLoop
 		rts 
 
+	.proc resetOAMSprite
+		pha 
+		asl a
+		asl a
+		pla 
+		tax 
+		and #3
+		tay 
+		:
+			lda oamNull, y
+			sta oam, x
+			dey 
+			dex 
+			beq :-
+		rts 
+	.endproc
+
+	.proc resetOAM
+		lda #0
+		:
+			pha 
+			jsr resetOAMSprite
+			pla 
+			tax 
+			inx 
+			tay 
+			cmp #64
+			bcc :-
+		rts 
+	.endproc
+
 	;
 	; Data
 	; 
 	; Game data is in this section. It's in the same code bank as above, and is only separated to make it easier to understand.
 	;
+
+	oamNull:
+		; Null Sprite contains:
+		;	Y position of 255 (offscreen)
+		;	Sprite Tile #0 (VRAM $0000-$0001 or $1000-$1001 depending
+		;		on PPU_CTRL's settings)
+		;	Attributes %0000 0000 (Not flipped either axis, In front of
+		;		Nametables, colored using pallete 0 (1/4))
+		;	X position of 0
+		;
+		; Did I realy just glaze over four bytes?
+
+		.byte $FF, $00, $00, $00
+
+	arrowAnimationOffsets:
+		.byte 0, 1, 2, 1
 
 	; Include the nametable data as a binary file
 	background:
@@ -484,9 +842,51 @@ FAMISTUDIO_DPCM_OFF = dmc
 	dmc:
 		.incbin "./sound/abyssgarding_dmc.dmc"
 
+	jumpTableLO:
+		.lobytes nothing, bankFloop, settings, nothing, nothing, nothing
+	jumpTableHI:
+		.hibytes nothing, bankFloop, settings, nothing, nothing, nothing
+	
+	; initJumpTableLO:
+	; 	.lobytes nothing, nothing, nothing, nothing, nothing, nothing
+	; initJumpTableHI:
+	; 	.hibytes nothing, nothing, nothing, nothing, nothing, nothing
+	; initJumpTableBank:
+	; 	.byte $FF, $F, $FF
+
 .segment "ROM_00"
 	bank0loop:
 		rts 
+	.include "./sound/music_abyssgarding_preabyss_title.s"
+	.include "./sound/music_abyssgarding_abyssmodding_settings.s"
+	title_leftArrowPositions:
+		.byte 104;, 127
+		.byte 80;, 151
+		.byte 88;, 159
+	title_rightArrowPositions:
+		.byte 153;, 127
+		.byte 169;, 151
+		.byte 161;, 159
+	title_arrowYPositions:
+		.byte 127
+		.byte 143
+		.byte 159
+
+	setting_leftArrowPositions:
+		.byte 255;, 127
+		.byte 72;, 151
+		.byte 88;, 159
+	setting_rightArrowPositions:
+		.byte 177;, 127
+		.byte 145;, 151
+		.byte 161;, 159
+	setting_arrowYPositions:
+		.byte 95
+		.byte 111
+		.byte 159
+
+	settingsBG:
+		.incbin "../../graphics/settings.nam"
 .segment "ROM_01"
 	bank1loop:
 		rts 

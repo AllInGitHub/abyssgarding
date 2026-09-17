@@ -5,7 +5,7 @@
 
 .segment "CODE"
 
-    ; Bank table, used to 
+    ; Bank table, used to switch
     unrom_banktable:
         .byte $00, $01, $02, $03, $04, $05, $06, $07
         .byte $08, $09, $0a, $0b, $0c, $0d, $0e, $0f
@@ -57,4 +57,5 @@
 .segment "ROM_14" 
     jmp reset
 
-
+.export initialize_mapper
+.export unrom_set_prg_bank

@@ -24,16 +24,16 @@ music_data_super_fwmc:
 .global FAMISTUDIO_DPCM_PTR
 
 @instruments:
-	.word @env1,@env16,@env18,@env0 ; 00 : Noise Percussion 1
-	.word @env14,@env16,@env19,@env2 ; 01 : Triangle Drums
-	.word @env12,@env15,@env18,@env21 ; 02 : Recca Tri Note OFF 1
-	.word @env3,@env16,@env18,@env0 ; 03 : Noise Percussion 2
-	.word @env12,@env6,@env19,@env0 ; 04 : Journey to Silius Tom
-	.word @env12,@env10,@env19,@env0 ; 05 : Journey to Silius Tom (Fill)
-	.word @env24,@env23,@env11,@env0 ; 06 : Slap Bass
-	.word @env20,@env23,@env7,@env0 ; 07 : Lead 2
-	.word @env5,@env16,@env18,@env0 ; 08 : Fade 1
-	.word @env13,@env16,@env18,@env0 ; 09 : Noise Percussion 3
+	.word @env1,@env15,@env17,@env0 ; 00 : Noise Percussion 1
+	.word @env13,@env15,@env18,@env2 ; 01 : Triangle Drums
+	.word @env11,@env14,@env17,@env20 ; 02 : Recca Tri Note OFF 1
+	.word @env3,@env15,@env17,@env0 ; 03 : Noise Percussion 2
+	.word @env11,@env5,@env18,@env0 ; 04 : Journey to Silius Tom
+	.word @env11,@env9,@env18,@env0 ; 05 : Journey to Silius Tom (Fill)
+	.word @env24,@env23,@env10,@env0 ; 06 : Slap Bass
+	.word @env19,@env23,@env6,@env0 ; 07 : Lead 2
+	.word @env4,@env15,@env17,@env0 ; 08 : Fade 1
+	.word @env12,@env15,@env17,@env0 ; 09 : Noise Percussion 3
 
 @env0:
 	.byte $00,$c0,$7f,$00,$02
@@ -44,41 +44,41 @@ music_data_super_fwmc:
 @env3:
 	.byte $00,$cf,$ca,$c5,$c0,$00,$04
 @env4:
-	.byte $fc,$c0,$00,$01
-@env5:
 	.byte $04,$cf,$00,$01,$ce,$cd,$cc,$cb,$ca,$c9,$c8,$c7,$c6,$c5,$c4,$c3,$c2,$c1,$c0,$00,$12
-@env6:
+@env5:
 	.byte $c0,$bf,$be,$bd,$bc,$bb,$ba,$b9,$b8,$00,$08
-@env7:
+@env6:
 	.byte $c0,$03,$c1,$c2,$c3,$c3,$06,$c2,$06,$c1,$06,$c2,$05,$c2,$00,$05
-@env8:
+@env7:
 	.byte $00,$c0,$bf,$be,$bd,$be,$bf,$c0,$c1,$c2,$c3,$c2,$c1,$00,$01
-@env9:
+@env8:
 	.byte $00,$cf,$ce,$cd,$cc,$cb,$ca,$c9,$c8,$c7,$c6,$c5,$c4,$c3,$c2,$c1,$03,$c2,$c3,$c4,$c5,$c6,$c7,$c8,$c9,$ca,$cb,$cc,$cd,$ce,$cf,$00,$01
-@env10:
+@env9:
 	.byte $c0,$bf,$c0,$c1,$00,$03
-@env11:
+@env10:
 	.byte $c0,$02,$c1,$03,$c2,$03,$c3,$03,$c2,$02,$c2,$00,$02
-@env12:
+@env11:
 	.byte $00,$cf,$7f,$00,$02
-@env13:
+@env12:
 	.byte $00,$cf,$cd,$cb,$c9,$c7,$c5,$c3,$c1,$c0,$00,$09
-@env14:
+@env13:
 	.byte $00,$cf,$ce,$cd,$cc,$cb,$ca,$c9,$c8,$c7,$c6,$c5,$c4,$c3,$c2,$c1,$00,$0f
-@env15:
+@env14:
 	.byte $c0,$7f,$7f,$c1,$00,$00
-@env16:
+@env15:
 	.byte $c0,$7f,$00,$01
-@env17:
+@env16:
 	.byte $c0,$05,$c1,$05,$c2,$05,$c3,$05,$c2,$05,$c1,$04,$c1,$00,$00
-@env18:
+@env17:
 	.byte $7f,$00,$00
-@env19:
+@env18:
 	.byte $c2,$7f,$00,$00
-@env20:
+@env19:
 	.byte $0d,$cf,$ce,$cd,$cc,$ca,$c9,$c8,$06,$c7,$06,$00,$07,$c7,$c7,$c6,$c6,$c5,$c5,$c4,$c4,$c3,$c3,$c2,$c2,$c1,$c1,$c0,$00,$1b
-@env21:
+@env20:
 	.byte $00,$b2,$7f,$00,$02
+@env21:
+	.byte $fc,$80,$c0,$00,$02
 @env22:
 	.byte $00,$c0,$be,$bc,$bc,$bd,$bf,$c1,$c3,$c4,$c4,$c2,$00,$01
 @env23:
@@ -87,14 +87,14 @@ music_data_super_fwmc:
 	.byte $00,$cf,$ca,$c8,$c7,$00,$04
 
 @samples:
-	.byte $00+.lobyte(FAMISTUDIO_DPCM_PTR),$2a,$09,$00 ; 00 flixelNote v1 D (Pitch:9)
-	.byte $0b+.lobyte(FAMISTUDIO_DPCM_PTR),$28,$02,$00 ; 01 flixelNote v1 D# (Pitch:2)
-	.byte $0b+.lobyte(FAMISTUDIO_DPCM_PTR),$28,$05,$00 ; 02 flixelNote v1 D# (Pitch:5)
-	.byte $0b+.lobyte(FAMISTUDIO_DPCM_PTR),$28,$06,$00 ; 03 flixelNote v1 D# (Pitch:6)
-	.byte $0b+.lobyte(FAMISTUDIO_DPCM_PTR),$28,$0b,$00 ; 04 flixelNote v1 D# (Pitch:11)
-	.byte $15+.lobyte(FAMISTUDIO_DPCM_PTR),$26,$03,$00 ; 05 flixelNote v1 E (Pitch:3)
-	.byte $15+.lobyte(FAMISTUDIO_DPCM_PTR),$26,$07,$00 ; 06 flixelNote v1 E (Pitch:7)
-	.byte $15+.lobyte(FAMISTUDIO_DPCM_PTR),$26,$09,$00 ; 07 flixelNote v1 E (Pitch:9)
+	.byte $00+.lobyte(FAMISTUDIO_DPCM_PTR),$2a,$09,$40 ; 00 flixelNote v1 D (Pitch:9)
+	.byte $0b+.lobyte(FAMISTUDIO_DPCM_PTR),$28,$02,$40 ; 01 flixelNote v1 D# (Pitch:2)
+	.byte $0b+.lobyte(FAMISTUDIO_DPCM_PTR),$28,$05,$40 ; 02 flixelNote v1 D# (Pitch:5)
+	.byte $0b+.lobyte(FAMISTUDIO_DPCM_PTR),$28,$06,$40 ; 03 flixelNote v1 D# (Pitch:6)
+	.byte $0b+.lobyte(FAMISTUDIO_DPCM_PTR),$28,$0b,$40 ; 04 flixelNote v1 D# (Pitch:11)
+	.byte $15+.lobyte(FAMISTUDIO_DPCM_PTR),$26,$03,$40 ; 05 flixelNote v1 E (Pitch:3)
+	.byte $15+.lobyte(FAMISTUDIO_DPCM_PTR),$26,$07,$40 ; 06 flixelNote v1 E (Pitch:7)
+	.byte $15+.lobyte(FAMISTUDIO_DPCM_PTR),$26,$09,$40 ; 07 flixelNote v1 E (Pitch:9)
 
 @tempo_env_1_mid:
 	.byte $03,$05,$80
